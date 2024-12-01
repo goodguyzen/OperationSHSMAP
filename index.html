@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Map Navigation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+        }
+
+        #mapContainer {
+            position: relative;
+            width: 960px;
+            height: 600px;
+            overflow: hidden;
+        }
+
+        #searchContainer {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        #searchBar {
+            padding: 10px;
+            font-size: 14px;
+            width: 250px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        #suggestions {
+            border: transparent;
+            border-radius: 4px;
+            max-height: 150px;
+            overflow-y: auto;
+            background-color: white;
+            position: absolute;
+            top: 50px;
+            width: 273px;
+            z-index: 1001;
+        }
+
+        .suggestion-item {
+            padding: 10px;
+            cursor: pointer;
+        }
+
+        .suggestion-item:hover {
+            background-color: #f0f0f0;
+        }
+
+        #directionsButton {
+            padding: 10px;
+            font-size: 14px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+
+        #directionsButton:hover {
+            background-color: #45a049;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 10px;
+            overflow-y: hidden;
+            overflow-x: hidden;
+        }
+    </style>
+</head>
+<body>
+    <div id="mapContainer">
+        <iframe id="mapIframe" src="mapindex.html" allow="fullscreen"></iframe>
+        <div id="searchContainer">
+            <input type="text" id="searchBar" placeholder="Search A Building">
+            <div id="suggestions"></div>
+            <button id="directionsButton" onclick="onDirectionsButtonClick()">Directions</button>
+        </div>
+    </div>
+
+    <script>
+        const buildingNames = [
+            "Arca",
+            "Samonte",
+            "Rodriguez",
+            "Mascardo",
+            "CSS",
+            "Hard Trade",
+            "Soft Trade 1",
+            "Soft Trade 2"
+        ];
+
+        const searchBar = document.getElementById('searchBar');
+        const suggestionsContainer = document.getElementById('suggestions');
+
+        searchBar.addEventListener('input', function() {
+            const query = this.value.toLowerCase();
+            suggestionsContainer.innerHTML = '';
+
+            if (query) {
+                const filteredNames = buildingNames.filter(name => name.toLowerCase().includes(query));
+                filteredNames.forEach(name => {
+                    const suggestionItem = document.createElement('div');
+                    suggestionItem.className = 'suggestion-item';
+                    suggestionItem.textContent = name;
+                    suggestionItem.onclick = function() {
+                        searchBar.value = name;
+                        suggestionsContainer.innerHTML = '';
+                    };
+                    suggestionsContainer.appendChild(suggestionItem);
+                });
+            }
+        });
+
+        // Function to handle directions button click
+        function onDirectionsButtonClick() {
+            if (!searchBar.value.trim()) {
+                alert("Please enter a building name.");
+                return;
+            }
+
+            const directionsButton = document.getElementById("directionsButton");
+            directionsButton.disabled = true;
+            directionsButton.textContent = "Loading...";
+
+            const iframe = document.getElementById("mapIframe");
+            if (iframe && iframe.contentWindow && iframe.contentWindow.unityInstance) {
+                const unityInstance = iframe.contentWindow.unityInstance;
+
+                if (unityInstance) {
+                    console.log("Sending message to Unity: " + searchBar.value.trim());
+                    unityInstance.SendMessage("PathManagerObject", "ShowPath", searchBar.value.trim());
+
+                    // Focus the iframe
+                    iframe.focus();
+                } else {
+                    console.error("Unity instance is not available.");
+                    alert("Unity instance is not available.");
+                }
+
+            } else {
+                console.error("Iframe or Unity instance not loaded.");
+                alert("Iframe or Unity instance not loaded.");
+            }
+
+            directionsButton.disabled = false;
+            directionsButton.textContent = "Directions";
+        }
+
+        // Function to handle map loading
+        function onMapLoaded() {
+            console.log("Unity map has finished loading");
+            
+            // Wait for Unity content to load
+            function waitForUnity() {
+                if (typeof unityInstance !== 'undefined') {
+                    console.log("Unity instance is available.");
+                    return true;
+                } else {
+                    console.log("Waiting for Unity instance...");
+                    setTimeout(waitForUnity, 100);
+                }
+            }
+
+            // Call waitForUnity function to check for Unity instance
+            waitForUnity();
+        }
+
+        // Call this function when the page loads
+        window.onload = function() {
+            resizeIframe();
+            onMapLoaded();
+        };
+
+        // Function to handle iframe resizing
+        function resizeIframe() {
+            var iframe = document.getElementById('mapIframe');
+            var iframeWindow = iframe.contentWindow || iframe.contentDocument.parentWindow;
+            var contentHeight = iframeWindow.document.body.scrollHeight;
+
+            if (contentHeight > iframe.style.height) {
+                iframe.style.height = contentHeight + 'px';
+            }
+        }
+
+        // Also call it whenever the iframe content changes
+        setInterval(resizeIframe, 100);
+
+        // Add event listener to refocus the iframe when clicking outside
+        document.addEventListener('click', function(event) {
+            const iframe = document.getElementById('mapIframe');
+            const mapContainer = document.getElementById('mapContainer');
+
+            // Check if the click was outside the map container
+            if (!mapContainer.contains(event.target)) {
+                // Refocus the iframe
+                iframe.focus();
+            }
+        });
+    </script>
+</body>
+</html>
